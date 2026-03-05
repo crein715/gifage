@@ -18,6 +18,29 @@ export async function signInWithGoogle(): Promise<{
   });
 }
 
+export async function signInWithEmail(email: string, password: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function signUpWithEmail(email: string, password: string): Promise<{
+  success: boolean;
+  error?: string;
+  needsConfirmation?: boolean;
+}> {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) return { success: false, error: error.message };
+
+  if (data.user && !data.session) {
+    return { success: true, needsConfirmation: true };
+  }
+  return { success: true };
+}
+
 export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
 }
