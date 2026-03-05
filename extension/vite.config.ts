@@ -8,6 +8,21 @@ import {
   writeFileSync,
   rmSync,
 } from 'fs';
+import { build as esbuild } from 'esbuild';
+
+function loadEnv() {
+  const envPath = resolve(__dirname, '.env');
+  if (!existsSync(envPath)) return {};
+  const content = readFileSync(envPath, 'utf-8');
+  const env: Record<string, string> = {};
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const [key, ...rest] = trimmed.split('=');
+    env[key.trim()] = rest.join('=').trim();
+  }
+  return env;
+}
 
 function fixPopupPathsPlugin() {
   return {
@@ -29,8 +44,41 @@ function fixPopupPathsPlugin() {
   };
 }
 
+function buildScriptsPlugin() {
+  return {
+    name: 'build-scripts',
+    async closeBundle() {
+      const env = loadEnv();
+      const define = {
+        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
+        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || ''),
+      };
+
+      await esbuild({
+        entryPoints: [resolve(__dirname, 'src/background/index.ts')],
+        bundle: true,
+        outfile: resolve(__dirname, 'dist/background.js'),
+        format: 'esm',
+        target: 'chrome120',
+        minify: true,
+        define,
+      });
+
+      await esbuild({
+        entryPoints: [resolve(__dirname, 'src/content/index.ts')],
+        bundle: true,
+        outfile: resolve(__dirname, 'dist/content.js'),
+        format: 'iife',
+        target: 'chrome120',
+        minify: true,
+        define,
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), fixPopupPathsPlugin()],
+  plugins: [react(), fixPopupPathsPlugin(), buildScriptsPlugin()],
   base: './',
   resolve: {
     alias: {
@@ -43,15 +91,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'src/popup/index.html'),
-        content: resolve(__dirname, 'src/content/index.ts'),
-        background: resolve(__dirname, 'src/background/index.ts'),
       },
       output: {
-        entryFileNames: (chunkInfo) => {
-          if (chunkInfo.name === 'content') return 'content.js';
-          if (chunkInfo.name === 'background') return 'background.js';
-          return 'assets/[name]-[hash].js';
-        },
+        entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
       },
