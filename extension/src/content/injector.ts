@@ -22,13 +22,40 @@ function getTweetUrl(tweetEl: Element): string {
   return window.location.href;
 }
 
-function showToast(button: HTMLElement): void {
+function getTweetAuthor(tweetEl: Element): string {
+  const userNameEl = tweetEl.querySelector('[data-testid="User-Name"]');
+  if (userNameEl) {
+    const links = userNameEl.querySelectorAll('a[href^="/"]');
+    for (const link of links) {
+      const href = (link as HTMLAnchorElement).pathname;
+      if (href && !href.includes('/status/') && href !== '/') {
+        return href.replace(/^\//, '@');
+      }
+    }
+  }
+  const authorLink = tweetEl.querySelector(
+    'a[role="link"][href^="/"][tabindex="-1"]'
+  );
+  if (authorLink) {
+    const href = (authorLink as HTMLAnchorElement).pathname;
+    return href.replace(/^\//, '@');
+  }
+  return '';
+}
+
+type ToastType = 'success' | 'error' | 'info';
+
+function showToast(
+  button: HTMLElement,
+  message: string,
+  type: ToastType
+): void {
   const existing = button.querySelector('.gifage-toast');
   if (existing) existing.remove();
 
   const toast = document.createElement('span');
-  toast.className = 'gifage-toast';
-  toast.textContent = 'Saved!';
+  toast.className = `gifage-toast gifage-toast-${type}`;
+  toast.textContent = message;
   button.style.position = 'relative';
   button.appendChild(toast);
 
@@ -39,7 +66,7 @@ function showToast(button: HTMLElement): void {
   setTimeout(() => {
     toast.classList.remove('gifage-toast-visible');
     setTimeout(() => toast.remove(), 200);
-  }, 1500);
+  }, 2000);
 }
 
 function createButton(media: DetectedMedia[], tweetUrl: string): HTMLElement {
@@ -74,29 +101,56 @@ function createButton(media: DetectedMedia[], tweetUrl: string): HTMLElement {
   container.appendChild(inner);
   container.appendChild(tooltip);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const isSaved = container.getAttribute('data-gifage-saved') === 'true';
     if (isSaved) return;
 
-    container.setAttribute('data-gifage-saved', 'true');
-    path.setAttribute('d', SAVED_ICON_PATH);
-
-    showToast(container);
+    const tweetEl = container.closest('article[data-testid="tweet"]');
+    const tweetAuthor = tweetEl ? getTweetAuthor(tweetEl) : '';
 
     try {
-      chrome.runtime.sendMessage(
-        {
-          type: 'SAVE_MEDIA',
-          payload: { media, tweetUrl },
-        },
-        () => {
-          if (chrome.runtime.lastError) {
-            // Extension context invalidated — ignore
-          }
-        }
-      );
+      const authResponse = await chrome.runtime.sendMessage({
+        type: 'CHECK_AUTH',
+      });
+
+      if (!authResponse?.authenticated) {
+        showToast(container, 'Sign in first \u2014 click the Gifage icon', 'info');
+        return;
+      }
+
+      container.setAttribute('data-gifage-saved', 'true');
+      path.setAttribute('d', SAVED_ICON_PATH);
+
+      const primaryMedia = media[0];
+      const response = await chrome.runtime.sendMessage({
+        type: 'SAVE_MEDIA',
+        payload: { media: primaryMedia, tweetUrl, tweetAuthor },
+      });
+
+      if (chrome.runtime.lastError) {
+        container.setAttribute('data-gifage-saved', 'false');
+        path.setAttribute('d', SAVE_ICON_PATH);
+        showToast(container, 'Failed to save \u2014 try again', 'error');
+        return;
+      }
+
+      if (response?.success) {
+        showToast(container, '\u2713 Saved to Gifage', 'success');
+      } else if (response?.error === 'Already saved') {
+        showToast(container, 'Already in your collection', 'info');
+      } else {
+        container.setAttribute('data-gifage-saved', 'false');
+        path.setAttribute('d', SAVE_ICON_PATH);
+        showToast(
+          container,
+          response?.error || 'Failed to save \u2014 try again',
+          'error'
+        );
+      }
     } catch {
-      // Extension context may be invalidated on update
+      container.setAttribute('data-gifage-saved', 'false');
+      path.setAttribute('d', SAVE_ICON_PATH);
+      showToast(container, 'Failed to save \u2014 try again', 'error');
     }
   };
 

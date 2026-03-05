@@ -62,7 +62,6 @@ export function injectStyles(): void {
       bottom: calc(100% + 4px);
       left: 50%;
       transform: translateX(-50%);
-      background-color: ${BRAND_COLOR};
       color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 12px;
@@ -75,6 +74,18 @@ export function injectStyles(): void {
       opacity: 0;
       transition: opacity 0.15s ease;
       z-index: 10000;
+    }
+
+    .gifage-toast-success {
+      background-color: #00BA7C;
+    }
+
+    .gifage-toast-error {
+      background-color: #F4212E;
+    }
+
+    .gifage-toast-info {
+      background-color: #1D9BF0;
     }
 
     .gifage-toast.gifage-toast-visible {

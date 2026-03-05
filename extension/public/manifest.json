@@ -5,11 +5,16 @@
   "description": "Save and collect GIFs, images, and videos from X.com",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "identity"
   ],
   "host_permissions": [
     "https://x.com/*",
-    "https://twitter.com/*"
+    "https://twitter.com/*",
+    "https://*.supabase.co/*",
+    "https://pbs.twimg.com/*",
+    "https://video.twimg.com/*",
+    "https://abs.twimg.com/*"
   ],
   "content_scripts": [
     {

@@ -1,7 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from 'fs';
+import {
+  mkdirSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+} from 'fs';
 
 function fixPopupPathsPlugin() {
   return {
